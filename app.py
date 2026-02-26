@@ -102,32 +102,46 @@ def format_result(result: dict) -> str:
 video_path = find_video_path()
 if video_path:
     b64 = file_to_b64(video_path)
+
     st.markdown(
         f"""
-<video style="
-    position:fixed;
-    top:0;
-    left:0;
-    width:100vw;
-    height:100vh;
-    object-fit:cover;
-    z-index:0;
-" autoplay muted loop playsinline>
-  <source src="data:video/mp4;base64,{b64}" type="video/mp4">
+<style>
+/* Make Streamlit transparent */
+.stApp {{
+    background: transparent !important;
+}}
+
+/* Background video */
+video {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+    z-index: -1;
+}}
+
+/* Dark overlay */
+.overlay {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 0;
+}}
+</style>
+
+<video autoplay muted loop playsinline>
+    <source src="data:video/mp4;base64,{b64}" type="video/mp4">
 </video>
 
-<div style="
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.45);
-    z-index:1;
-"></div>
+<div class="overlay"></div>
 """,
         unsafe_allow_html=True,
     )
-
-st.markdown('<div style="position:relative; z-index:2;">', unsafe_allow_html=True)
-
 # ---------------- Sidebar ----------------
 with st.sidebar:
     st.markdown("## 💬 Chats")
@@ -236,4 +250,3 @@ if prompt:
 
     current_chat["messages"].append({"role": "assistant", "content": answer})
     st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
