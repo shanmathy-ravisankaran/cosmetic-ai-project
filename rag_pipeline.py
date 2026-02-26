@@ -3,7 +3,7 @@ import re
 from dotenv import load_dotenv
 import pandas as pd
 
-from langchain_chroma import Chroma
+from langchain.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 
