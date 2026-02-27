@@ -10,7 +10,7 @@ The assistant supports:
     3)Brand-level queries
     4)Context-aware follow-up questions
 
-This project demonstrates practical RAG architecture, prompt engineering strategies, metadata validation, and explainable AI response generation in a real-world domain.
+    This project demonstrates practical RAG architecture, prompt engineering strategies, metadata validation, and explainable AI response generation in a real-world domain.
 
 ✨ Features
 
