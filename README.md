@@ -44,13 +44,6 @@ The assistant supports:
     │   └── chemicals.csv
     └── README.md
 
-💡 Example Queries
-
-    What products contain retinol?
-    List products with salicylic acid
-    Is retinol safe to use daily?
-    Tell me about Neutrogena
-
 📌 Highlights
 
     Implements end-to-end RAG workflow
