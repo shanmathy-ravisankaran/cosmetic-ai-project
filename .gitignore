@@ -209,3 +209,4 @@ __marimo__/
 # ---- Project specific ----
 vector_db/
 static/chem_loop.mp4
+.vscode/
