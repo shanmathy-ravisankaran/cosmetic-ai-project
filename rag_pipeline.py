@@ -18,6 +18,56 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_K = 5
 _AUDIT_EXACT_MATCH_TEST_DONE = False
+OUT_OF_SCOPE_MESSAGE = (
+    "Sorry, this question is not relevant to cosmetics. "
+    "Please ask about cosmetic products, brands, ingredients, or safety/usage."
+)
+
+COSMETIC_SCOPE_KEYWORDS = {
+    "cosmetic",
+    "cosmetics",
+    "beauty",
+    "skincare",
+    "skin care",
+    "skin",
+    "haircare",
+    "hair care",
+    "hair",
+    "makeup",
+    "fragrance",
+    "perfume",
+    "parfum",
+    "deodorant",
+    "shampoo",
+    "conditioner",
+    "cleanser",
+    "moisturizer",
+    "moisturiser",
+    "serum",
+    "lotion",
+    "cream",
+    "sunscreen",
+    "spf",
+    "face wash",
+    "acne",
+    "ingredient",
+    "ingredients",
+    "chemical",
+    "chemicals",
+    "product",
+    "products",
+    "brand",
+    "brands",
+    "company",
+    "companies",
+    "retinol",
+    "niacinamide",
+    "salicylic",
+    "hyaluronic",
+    "paraben",
+    "sulfate",
+    "sulphate",
+}
 
 
 def _safe_str(value: Any) -> str:
@@ -258,6 +308,8 @@ HYBRID_ASSISTANT_PROMPT = ChatPromptTemplate.from_messages(
             "system",
             "You are a helpful, hybrid cosmetic assistant.\n\n"
             "Rules:\n"
+            "- You are strictly limited to cosmetics topics: cosmetic products, brands, companies, ingredients/chemicals, and cosmetic safety/usage.\n"
+            "- If a user asks a non-cosmetics question, politely refuse and redirect them to cosmetics topics.\n"
             "- NEVER mention internal retrieval/RAG mechanics (do not say 'retrieved context', 'database does not contain', etc.).\n"
             "- Do NOT hallucinate product-specific claims that are not supported by the provided database facts.\n"
             "- If database facts are provided, use them as factual grounding, but weave them naturally into the answer.\n"
@@ -270,8 +322,9 @@ HYBRID_ASSISTANT_PROMPT = ChatPromptTemplate.from_messages(
             "User question:\n{question}\n\n"
             "Database facts (may be empty):\n{db_facts}\n\n"
             "Write a single, coherent answer in natural paragraphs:\n"
+            "- If the question is not about cosmetics, politely refuse and ask the user to switch to a cosmetics-related question.\n"
             "- If database facts are provided, first mention specific product names, brands, or companies that are relevant, then continue with a concise explanation.\n"
-            "- If no useful database facts are present, give a general but accurate explanation of the chemical or product without referring to any database limitations.\n"
+            "- If no useful database facts are present but the question is cosmetics-related, give a general but accurate cosmetics-focused explanation without referring to any database limitations.\n"
             "- Avoid inventing product-specific safety claims that are not supported by the database facts.\n"
             "- Never mention that information is missing from a database; always provide the most helpful explanation you can.\n",
         ),
@@ -335,6 +388,17 @@ def _query_matches_retrieved_metadata(question: str, docs: List[Document]) -> bo
     return False
 
 
+def _is_cosmetic_scope_question(question: str, docs: List[Document] = None) -> bool:
+    """Gate questions to cosmetics scope using keywords and optional retrieved metadata."""
+    qn = _norm_text(question)
+    if not qn:
+        return False
+
+    keyword_match = any(term in qn for term in COSMETIC_SCOPE_KEYWORDS)
+    metadata_match = _query_matches_retrieved_metadata(question, docs or [])
+    return keyword_match or metadata_match
+
+
 def _format_context(docs: List[Document]) -> str:
     if not docs:
         return "No relevant context retrieved."
@@ -379,6 +443,16 @@ def ask_question(
         print(f"[RAG FIX] ✓ OpenAI API Key found (length: {len(api_key)} characters)")
 
     try:
+        # Fast pre-check to block obvious out-of-scope requests before retrieval/LLM.
+        if not _is_cosmetic_scope_question(user_question):
+            print("[RAG SCOPE] Out-of-scope query blocked (pre-check).")
+            return {
+                "mode": "out_of_scope",
+                "answer": OUT_OF_SCOPE_MESSAGE,
+                "items": [],
+                "sources": [],
+            }
+
         ensure_vector_db(csv_path=csv_path, db_path=db_path, collection_name=collection_name)
 
         k = max(3, min(max_items or DEFAULT_K, 10))
@@ -460,6 +534,16 @@ def ask_question(
             chemical = doc.metadata.get("chemical", "N/A")
             print(f"  [{idx}] Chemical: {chemical}")
         print("=" * 60)
+
+        # Post-retrieval scope check protects against edge cases and noisy retrieval.
+        if not _is_cosmetic_scope_question(user_question, docs):
+            print("[RAG SCOPE] Out-of-scope query blocked (post-check).")
+            return {
+                "mode": "out_of_scope",
+                "answer": OUT_OF_SCOPE_MESSAGE,
+                "items": [],
+                "sources": [],
+            }
 
         # Decide whether we have a real dataset match (avoid irrelevant sources for unknown brands/terms)
         is_safety_q = _is_safety_question(user_question)
